@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #fef6ee;
+  --color-brand-100: #fdead7;
+  --color-brand-200: #fad1ae;
+  --color-brand-300: #f6b17b;
+  --color-brand-400: #f18a46;
+  --color-brand-500: #ec6a22;
+  --color-brand-600: #dd5218;
+  --color-brand-700: #b73e16;
+  --color-brand-800: #92331a;
+  --color-brand-900: #762c19;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+input[type="file"]::file-selector-button {
+  all: revert;
+}
+
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  }
+  .btn-primary {
+    @apply rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-secondary {
+    @apply rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+}

@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: restaurant-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: restaurant
+      POSTGRES_PASSWORD: restaurant
+      POSTGRES_DB: restaurant
+    ports:
+      # Host port 15432 (not the default 5432): local security software on this
+      # machine intercepts/blocks 5432, so a non-standard host port is used.
+      # Containers on the compose network still reach it as postgres:5432.
+      - "15432:5432"
+    volumes:
+      - restaurant_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restaurant -d restaurant"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: restaurant-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Reaches Postgres over the compose network (internal port 5432).
+      DATABASE_URL: "postgresql://restaurant:restaurant@postgres:5432/restaurant?schema=public"
+      JWT_SECRET: "teste123"
+      JWT_EXPIRES_IN: "12h"
+      PORT: "4000"
+      # Bind on all interfaces so the mapped port is reachable from the host.
+      HOST: "0.0.0.0"
+      # Browser origin of the frontend, for CORS.
+      CORS_ORIGIN: "http://localhost:5173"
+    ports:
+      - "4000:4000"
+    volumes:
+      # Live source for `node --watch`; keep the image's node_modules.
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    container_name: restaurant-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Consumed by the browser, so it points at the host-mapped backend port.
+      VITE_API_URL: "http://localhost:4000"
+      # Reliable file watching for the bind mount on Docker Desktop (Windows/macOS).
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  restaurant_pgdata:
