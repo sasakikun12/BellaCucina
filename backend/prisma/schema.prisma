@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  WAITER
+  KITCHEN
+  DELIVERY
+}
+
+enum TableStatus {
+  FREE
+  OCCUPIED
+  RESERVED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  SERVED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum ItemStatus {
+  PENDING
+  PREPARING
+  READY
+}
+
+enum StockMovementReason {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+  ORDER_ADJUSTMENT 
+  CANCELLATION_REVERSAL
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  menuItems MenuItem[]
+  createdAt DateTime   @default(now())
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Decimal  @db.Decimal(10, 2)
+  photoUrl    String?
+  available   Boolean  @default(true)
+  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  orderItems  OrderItem[]
+  recipeIngredients RecipeIngredient[]
+  recipePackaging   RecipePackaging[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Ingredient {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  unit         String 
+  currentStock Decimal  @db.Decimal(10, 3) @default(0)
+  minStock     Decimal  @db.Decimal(10, 3) @default(0)
+  recipeLines  RecipeIngredient[]
+  movements    StockMovement[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("ingredients")
+}
+
+model PackagingItem {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  unit         String
+  currentStock Decimal  @db.Decimal(10, 3) @default(0)
+  minStock     Decimal  @db.Decimal(10, 3) @default(0)
+  recipeLines  RecipePackaging[]
+  movements    StockMovement[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("packaging_items")
+}
+
+model RecipeIngredient {
+  id              String     @id @default(cuid())
+  menuItem        MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  menuItemId      String
+  ingredient      Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  ingredientId    String
+  quantityPerUnit Decimal    @db.Decimal(10, 3)
+
+  @@unique([menuItemId, ingredientId])
+  @@map("recipe_ingredients")
+}
+
+model RecipePackaging {
+  id              String        @id @default(cuid())
+  menuItem        MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  menuItemId      String
+  packagingItem   PackagingItem @relation(fields: [packagingItemId], references: [id], onDelete: Restrict)
+  packagingItemId String
+  quantityPerUnit Decimal       @db.Decimal(10, 3)
+
+  @@unique([menuItemId, packagingItemId])
+  @@map("recipe_packaging")
+}
+
+model StockMovement {
+  id              String                @id @default(cuid())
+  ingredient      Ingredient?           @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  ingredientId    String?
+  packagingItem   PackagingItem?        @relation(fields: [packagingItemId], references: [id], onDelete: SetNull)
+  packagingItemId String?
+  delta           Decimal               @db.Decimal(10, 3) 
+  reason          StockMovementReason
+  orderId         String?
+  createdAt       DateTime              @default(now())
+
+  @@map("stock_movements")
+}
+
+model RestaurantTable {
+  id        String      @id @default(cuid())
+  number    Int         @unique
+  capacity  Int
+  status    TableStatus @default(FREE)
+  orders    Order[]
+  createdAt DateTime    @default(now())
+
+  @@map("tables")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  type            OrderType
+  status          OrderStatus @default(PENDING)
+  table           RestaurantTable? @relation(fields: [tableId], references: [id])
+  tableId         String?
+  customerName    String?
+  customerPhone   String?
+  deliveryAddress String?
+  driver          StaffUser?  @relation("DriverOrders", fields: [driverId], references: [id])
+  driverId        String?
+  createdBy       StaffUser   @relation("CreatedOrders", fields: [createdById], references: [id])
+  createdById     String
+  total           Decimal     @db.Decimal(10, 2) @default(0)
+  notes           String?
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String     @id @default(cuid())
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id])
+  menuItemId String
+  quantity   Int
+  unitPrice  Decimal    @db.Decimal(10, 2)
+  notes      String?
+  status     ItemStatus @default(PENDING)
+
+  @@map("order_items")
+}
+
+model StaffUser {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role
+  createdOrders Order[]  @relation("CreatedOrders")
+  driverOrders  Order[]  @relation("DriverOrders")
+  createdAt     DateTime @default(now())
+
+  @@map("staff_users")
+}
